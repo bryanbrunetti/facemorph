@@ -246,15 +246,16 @@ def warp_triangle(src, src_tri, dst_tri, dst):
     mask = np.zeros((r2[3], r2[2], 3), dtype=np.float32)
     cv2.fillConvexPoly(mask, np.int32(t2), (1, 1, 1), cv2.LINE_AA)
 
-    y1, y2_c = r1[1], r1[1] + r1[3]
-    x1, x2_c = r1[0], r1[0] + r1[2]
-    y1 = max(0, y1)
-    x1 = max(0, x1)
-    y2_c = min(src.shape[0], y2_c)
-    x2_c = min(src.shape[1], x2_c)
-    crop = src[y1:y2_c, x1:x2_c]
-    if crop.size == 0:
+    # Clamp source crop to image bounds
+    y1 = max(0, r1[1])
+    x1 = max(0, r1[0])
+    y2_c = min(src.shape[0], r1[1] + r1[3])
+    x2_c = min(src.shape[1], r1[0] + r1[2])
+    if y2_c <= y1 or x2_c <= x1:
         return
+
+    # Contiguous copy avoids stride issues in OpenCV's C++ backend
+    crop = np.ascontiguousarray(src[y1:y2_c, x1:x2_c])
     if crop.shape[0] != r1[3] or crop.shape[1] != r1[2]:
         crop = cv2.resize(crop, (r1[2], r1[3]))
 
@@ -264,14 +265,14 @@ def warp_triangle(src, src_tri, dst_tri, dst):
         mat,
         (r2[2], r2[3]),
         flags=cv2.INTER_LINEAR,
-        borderMode=cv2.BORDER_REFLECT_101,
+        borderMode=cv2.BORDER_CONSTANT,
     )
 
+    # Clamp destination rect to image bounds
     dy = max(0, r2[1])
     dy2 = min(r2[1] + r2[3], dst.shape[0])
     dx = max(0, r2[0])
     dx2 = min(r2[0] + r2[2], dst.shape[1])
-    # Offset into mask/warped when the rect was clamped at top/left
     oy = dy - r2[1]
     ox = dx - r2[0]
     rh = dy2 - dy
