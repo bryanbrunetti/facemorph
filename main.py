@@ -87,10 +87,13 @@ _face_detector = dlib.cnn_face_detection_model_v1(_cnn_model_path)
 def align_face(file):
     """
     Detect and align the primary face in an image.
-    Returns (aligned_bgr_frame, mtcnn_keypoints_in_aligned_space) or None.
+    Returns (aligned_bgr_frame, mtcnn_keypoints_in_aligned_space, confidence,
+    face_fraction) or None.
     The keypoints are the 5 MTCNN points (left_eye, right_eye, nose,
     mouth_left, mouth_right) transformed through the same affine matrix
     used to align the image.
+    *confidence* is the MTCNN detection score (0-1).
+    *face_fraction* is the face bounding-box area as a fraction of the image area.
     """
     image = face_recognition.load_image_file(file)
     face_locations = detector.detect_faces(image)
@@ -98,7 +101,14 @@ def align_face(file):
         print(f"  No face detected in {file.name}, skipping.")
         return None
 
-    kp = face_locations[0]["keypoints"]
+    detection = face_locations[0]
+    confidence = detection["confidence"]
+    box = detection["box"]  # [x, y, width, height]
+    img_area = image.shape[0] * image.shape[1]
+    face_area = max(0, box[2]) * max(0, box[3])
+    face_fraction = face_area / img_area if img_area > 0 else 0.0
+
+    kp = detection["keypoints"]
     leftEyeCenter = kp["left_eye"]
     rightEyeCenter = kp["right_eye"]
 
@@ -148,7 +158,7 @@ def align_face(file):
     transformed = (M @ raw_pts_h.T).T  # Nx2
     mtcnn_kps = [(int(round(p[0])), int(round(p[1]))) for p in transformed]
 
-    return cv2.cvtColor(output, cv2.COLOR_RGB2BGR), mtcnn_kps
+    return cv2.cvtColor(output, cv2.COLOR_RGB2BGR), mtcnn_kps, confidence, face_fraction
 
 
 # ── Landmark extraction ─────────────────────────────────────────────────────
@@ -381,6 +391,26 @@ def main():
         action="store_true",
         help="Also save individual aligned frames alongside the video.",
     )
+    parser.add_argument(
+        "--min-confidence",
+        type=float,
+        default=0.95,
+        help="Minimum MTCNN face-detection confidence (0-1). Images below "
+        "this threshold are rejected (default: 0.95).",
+    )
+    parser.add_argument(
+        "--min-face-size",
+        type=float,
+        default=0.0,
+        help="Minimum face bounding-box area as a fraction of the image "
+        "(0-1). Rejects distant/tiny faces (default: 0 = no minimum).",
+    )
+    parser.add_argument(
+        "--require-dlib",
+        action="store_true",
+        help="Reject images where dlib's 68-point landmark detector fails "
+        "(ensures consistent high-quality morphs).",
+    )
     args = parser.parse_args()
 
     # ── validate paths ────────────────────────────────────────────────────
@@ -416,13 +446,31 @@ def main():
     print(f"Processing {len(files)} image(s) from {input_dir}")
     frame_size = args.size
     aligned = []  # list of (bgr_frame, landmarks, mtcnn_kps, used_dlib, filename)
+    rejected = []  # list of (filename, reason)
 
     for idx, file in enumerate(files):
         print(f"[{idx + 1}/{len(files)}] {file.name}")
         result = align_face(file)
         if result is None:
+            rejected.append((file.name, "no face detected"))
             continue
-        frame, mtcnn_kps = result
+        frame, mtcnn_kps, confidence, face_fraction = result
+
+        # ── Face quality checks ───────────────────────────────────────────
+        if confidence < args.min_confidence:
+            reason = f"low confidence ({confidence:.3f} < {args.min_confidence})"
+            print(f"  Rejected: {reason}")
+            rejected.append((file.name, reason))
+            continue
+
+        if args.min_face_size > 0 and face_fraction < args.min_face_size:
+            reason = (
+                f"face too small ({face_fraction:.1%} of image "
+                f"< {args.min_face_size:.1%})"
+            )
+            print(f"  Rejected: {reason}")
+            rejected.append((file.name, reason))
+            continue
 
         if frame_size is None:
             frame_size = (frame.shape[1], frame.shape[0])
@@ -435,6 +483,11 @@ def main():
         used_dlib = False
         if args.morph_steps > 0:
             landmarks, used_dlib = get_landmarks(frame, mtcnn_kps)
+            if args.require_dlib and not used_dlib:
+                reason = "dlib 68-point landmarks failed (--require-dlib)"
+                print(f"  Rejected: {reason}")
+                rejected.append((file.name, reason))
+                continue
 
         aligned.append((frame, landmarks, mtcnn_kps, used_dlib, file.name))
 
@@ -445,6 +498,12 @@ def main():
     if not aligned:
         print("No faces detected in any image - no video produced.")
         return
+
+    if rejected:
+        print(f"\nRejected {len(rejected)} image(s):")
+        for name, reason in rejected:
+            print(f"  {name}: {reason}")
+        print()
 
     # ── Phase 2: write video ──────────────────────────────────────────────
     print(f"")
