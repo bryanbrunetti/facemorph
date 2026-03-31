@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+venv/
+.venv/
+env/
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# C++ build artifacts
+cpp/build/
+*.o
+*.a
+*.so
+*.dylib
+*.exe
+
+# Large model/data files
+*.dat
+*.onnx
+*.pb
+*.pt
+*.pth
+cpp/models/*.dat
+
+# Output files
+output.mp4
+frames/
+*.mp4
+*.avi
+*.mov
+
+# Editor / OS
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
