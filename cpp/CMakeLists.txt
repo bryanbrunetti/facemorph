@@ -23,8 +23,14 @@ if(NOT EXISTS "${_MODEL_DAT}")
         message(FATAL_ERROR "Failed to download landmark model: ${_dl_status}")
     endif()
     message(STATUS "Decompressing landmark model ...")
-    file(ARCHIVE_EXTRACT INPUT "${_MODEL_BZ2}" DESTINATION "${_MODEL_DIR}")
-    file(REMOVE "${_MODEL_BZ2}")
+    find_program(_BZIP2 bzip2 REQUIRED)
+    execute_process(
+        COMMAND "${_BZIP2}" -d "${_MODEL_BZ2}"
+        RESULT_VARIABLE _bz2_result
+    )
+    if(NOT _bz2_result EQUAL 0)
+        message(FATAL_ERROR "bzip2 decompression failed (exit code ${_bz2_result})")
+    endif()
     if(NOT EXISTS "${_MODEL_DAT}")
         message(FATAL_ERROR "Decompression failed — ${_MODEL_DAT} not found after extraction.")
     endif()
