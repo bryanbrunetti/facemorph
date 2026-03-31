@@ -267,17 +267,20 @@ def warp_triangle(src, src_tri, dst_tri, dst):
         borderMode=cv2.BORDER_REFLECT_101,
     )
 
-    dy = r2[1]
+    dy = max(0, r2[1])
     dy2 = min(r2[1] + r2[3], dst.shape[0])
-    dx = r2[0]
+    dx = max(0, r2[0])
     dx2 = min(r2[0] + r2[2], dst.shape[1])
+    # Offset into mask/warped when the rect was clamped at top/left
+    oy = dy - r2[1]
+    ox = dx - r2[0]
     rh = dy2 - dy
     rw = dx2 - dx
     if rh <= 0 or rw <= 0:
         return
     region = dst[dy:dy2, dx:dx2]
-    m = mask[:rh, :rw]
-    w = warped[:rh, :rw]
+    m = mask[oy:oy + rh, ox:ox + rw]
+    w = warped[oy:oy + rh, ox:ox + rw]
     dst[dy:dy2, dx:dx2] = region * (1 - m) + w * m
 
 
