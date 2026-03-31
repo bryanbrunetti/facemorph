@@ -5,7 +5,44 @@
 #include <iostream>
 #include <string>
 
+#if defined(__linux__)
+#  include <unistd.h>
+#elif defined(_WIN32)
+#  include <windows.h>
+#elif defined(__APPLE__)
+#  include <mach-o/dyld.h>
+#  include <limits.h>
+#endif
+
 namespace fs = std::filesystem;
+
+// Return the directory containing this executable.
+static fs::path exe_dir() {
+#if defined(__linux__)
+    char buf[4096];
+    ssize_t n = readlink("/proc/self/exe", buf, sizeof(buf) - 1);
+    if (n > 0) { buf[n] = '\0'; return fs::path(buf).parent_path(); }
+#elif defined(_WIN32)
+    char buf[MAX_PATH];
+    if (GetModuleFileNameA(NULL, buf, MAX_PATH))
+        return fs::path(buf).parent_path();
+#elif defined(__APPLE__)
+    char buf[PATH_MAX];
+    uint32_t sz = sizeof(buf);
+    if (_NSGetExecutablePath(buf, &sz) == 0) {
+        std::error_code ec;
+        return fs::canonical(buf, ec).parent_path();
+    }
+#endif
+    return fs::current_path();
+}
+
+// Locate the landmark model: prefer a copy next to the executable, then CWD.
+static fs::path find_default_model() {
+    fs::path candidate = exe_dir() / "models" / "shape_predictor_68_face_landmarks.dat";
+    if (fs::exists(candidate)) return candidate;
+    return fs::path("models") / "shape_predictor_68_face_landmarks.dat";
+}
 
 static void print_usage(const char* prog) {
     std::cout
@@ -26,7 +63,7 @@ static void print_usage(const char* prog) {
         << "                             (default: auto from first image)\n"
         << "  --save-frames              Save individual aligned/morphed frames\n"
         << "  --model <path>             Path to shape_predictor_68_face_landmarks.dat\n"
-        << "                             (default: models/shape_predictor_68_face_landmarks.dat)\n"
+        << "                             (default: auto-detected next to the executable)\n"
         << "  -h, --help                 Show this help message and exit\n";
 }
 
@@ -55,7 +92,7 @@ int main(int argc, char* argv[]) {
     }
 
     core::PipelineSettings settings;
-    std::string model_path = "models/shape_predictor_68_face_landmarks.dat";
+    std::string model_path = find_default_model().string();
     bool input_set = false;
 
     for (int i = 1; i < argc; ++i) {

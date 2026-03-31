@@ -1,8 +1,29 @@
 # Model Files
 
-This directory holds the **dlib shape-predictor models** used for facial-landmark
-detection. The models are too large to commit to version control and must be
-downloaded separately.
+This directory holds the **dlib shape-predictor model** used for facial-landmark
+detection.
+
+---
+
+## Automatic Download
+
+The model is **downloaded automatically** by CMake during the configure step:
+
+```sh
+cd cpp
+mkdir build && cd build
+cmake ..   # ← downloads and decompresses the model here
+```
+
+CMake fetches `shape_predictor_68_face_landmarks.dat.bz2` (~100 MB) from
+`http://dlib.net/files/`, decompresses it, and places the resulting
+`shape_predictor_68_face_landmarks.dat` in this directory.  The compressed
+archive is deleted afterwards.
+
+The model is also copied into `build/models/` so both the CLI and GUI
+executables find it without requiring any `--model` flag.  On macOS the model
+is additionally embedded inside the `.app` bundle's
+`Contents/Resources/models/` folder for a fully self-contained application.
 
 ---
 
@@ -12,43 +33,11 @@ downloaded separately.
 |---|---|---|
 | `shape_predictor_68_face_landmarks.dat` | ~100 MB | 68-point facial-landmark detection (primary) |
 
-### Download & Install
-
-1. **Download** the compressed model from dlib's official repository:
-
-   <http://dlib.net/files/shape_predictor_68_face_landmarks.dat.bz2>
-
-2. **Decompress** the archive:
-
-   ```sh
-   # macOS / Linux
-   bunzip2 shape_predictor_68_face_landmarks.dat.bz2
-
-   # Windows (PowerShell, using 7-Zip)
-   7z x shape_predictor_68_face_landmarks.dat.bz2
-   ```
-
-3. **Place** the resulting `.dat` file in this directory so the final path is:
-
-   ```
-   cpp/models/shape_predictor_68_face_landmarks.dat
-   ```
-
-### Verification
-
-After decompression you should have a single file of roughly 99.7 MB:
-
-```sh
-ls -lh shape_predictor_68_face_landmarks.dat
-# -rw-r--r--  1 user  staff    99M  ...  shape_predictor_68_face_landmarks.dat
-```
-
 ---
 
 ## Alternative: Custom Model Path
 
-If you prefer to keep the model file somewhere else on disk, you can point the
-application to it instead of placing it in this directory:
+If you prefer to use a model stored elsewhere on disk:
 
 - **CLI** — pass the `--model` flag:
 
@@ -56,24 +45,7 @@ application to it instead of placing it in this directory:
   ./image_transition_cli <input_dir> --model /path/to/shape_predictor_68_face_landmarks.dat
   ```
 
-- **GUI** — set the model path in **Preferences → Model File** (or use the
-  file-picker dialog on first launch).
-
----
-
-## Optional: 5-Point Model (Lightweight Fallback)
-
-For faster (but less accurate) alignment you can also download the smaller
-5-point predictor:
-
-| File | Size (approx.) | Purpose |
-|---|---|---|
-| `shape_predictor_5_face_landmarks.dat` | ~9 MB | 5-point landmark detection (fallback) |
-
-Download URL: <http://dlib.net/files/shape_predictor_5_face_landmarks.dat.bz2>
-
-The application will automatically fall back to the 5-point model if it is
-present in this directory and the 68-point model cannot be found.
+- **GUI** — use the **Model File** picker to select an alternative file.
 
 ---
 

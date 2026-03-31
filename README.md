@@ -65,33 +65,27 @@ macOS `.app` — with no Python runtime or interpreter required.
 
 ## Model Files
 
-The dlib 68-point shape predictor model is **not** included in this repository
-(it is approximately 100 MB). You must download it before running the
-application.
+The dlib 68-point shape predictor model (~100 MB) is **automatically downloaded
+and decompressed** by CMake during the configure step. No manual setup is
+required — simply run `cmake ..` and the model will appear in `cpp/models/`.
 
-### Quick Setup
+The model is also:
 
-```sh
-cd cpp/models
+- **Copied into the build directory** (`build/models/`) so the CLI and GUI
+  executables find it automatically without needing `--model`.
+- **Embedded inside the macOS `.app` bundle** under `Contents/Resources/models/`
+  so the GUI is fully self-contained.
 
-# Download
-curl -LO http://dlib.net/files/shape_predictor_68_face_landmarks.dat.bz2
+If you prefer to use a model file from a different location, you can still
+override the path:
 
-# Decompress (macOS / Linux)
-bunzip2 shape_predictor_68_face_landmarks.dat.bz2
+- **CLI** — pass `--model <path>`:
 
-# Decompress (Windows — PowerShell with 7-Zip)
-# 7z x shape_predictor_68_face_landmarks.dat.bz2
-```
+  ```sh
+  ./image_transition_cli ./photos --model /path/to/shape_predictor_68_face_landmarks.dat
+  ```
 
-After decompression you should have:
-
-```
-cpp/models/shape_predictor_68_face_landmarks.dat   (~99.7 MB)
-```
-
-You can also place the model anywhere on disk and point to it with `--model` in
-the CLI or the **Model File** picker in the GUI.
+- **GUI** — use the **Model File** picker to select an alternative file.
 
 See [`cpp/models/README.md`](cpp/models/README.md) for more details.
 
@@ -228,7 +222,7 @@ image_transition_cli <input_dir> [options]
 | `--morph-steps <int>` | `0` | Number of intermediate morph frames between each pair of images (`0` = hard cut) |
 | `--size <WxH>` | *auto* | Force output frame size, e.g. `1280x720` (default: dimensions of the first aligned image) |
 | `--save-frames` | *off* | Save individual aligned and morphed frames as PNGs alongside the video |
-| `--model <path>` | `models/shape_predictor_68_face_landmarks.dat` | Path to the dlib 68-point shape predictor model |
+| `--model <path>` | *auto* (next to executable) | Path to the dlib 68-point shape predictor model |
 | `-h`, `--help` | | Show usage information and exit |
 
 ### Examples
@@ -414,9 +408,13 @@ cmake --build . --config Release --parallel $(nproc)
 
 ### Model file not found
 
-- Download `shape_predictor_68_face_landmarks.dat` as described in
-  [Model Files](#model-files).
-- Pass the correct path via `--model` or the GUI file picker.
+- Re-run `cmake ..` from the `cpp/build` directory — it will download the model
+  automatically if it is missing from `cpp/models/`.
+- If the download fails (e.g., no internet access), place
+  `shape_predictor_68_face_landmarks.dat` in `cpp/models/` manually, then
+  re-run `cmake ..` (it will skip the download and copy the file).
+- Pass the correct path via `--model` or the GUI file picker if you store the
+  model in a custom location.
 
 ---
 

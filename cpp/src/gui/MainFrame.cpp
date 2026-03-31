@@ -3,6 +3,25 @@
 
 #include <wx/statbox.h>
 #include <wx/font.h>
+#include <wx/stdpaths.h>
+#include <wx/filename.h>
+
+// Locate the bundled landmark model: bundle Resources on macOS, exe dir elsewhere.
+static wxString find_default_model() {
+#ifdef __APPLE__
+    {
+        wxString resources = wxStandardPaths::Get().GetResourcesDir();
+        wxString candidate = resources + wxFILE_SEP_PATH
+                           + "models" + wxFILE_SEP_PATH
+                           + "shape_predictor_68_face_landmarks.dat";
+        if (wxFileExists(candidate)) return candidate;
+    }
+#endif
+    wxFileName exe(wxStandardPaths::Get().GetExecutablePath());
+    return exe.GetPath() + wxFILE_SEP_PATH
+         + "models" + wxFILE_SEP_PATH
+         + "shape_predictor_68_face_landmarks.dat";
+}
 
 MainFrame::MainFrame(const wxString& title)
     : wxFrame(nullptr, wxID_ANY, title, wxDefaultPosition, wxSize(700, 650))
@@ -33,7 +52,8 @@ MainFrame::MainFrame(const wxString& title)
 
     path_grid->Add(new wxStaticText(panel, wxID_ANY, "Model File:"),
                    0, wxALIGN_CENTER_VERTICAL);
-    model_picker_ = new wxFilePickerCtrl(panel, wxID_ANY, wxEmptyString,
+    wxString default_model = find_default_model();
+    model_picker_ = new wxFilePickerCtrl(panel, wxID_ANY, default_model,
                                          "Select landmark model file",
                                          "DAT files (*.dat)|*.dat",
                                          wxDefaultPosition, wxDefaultSize,
